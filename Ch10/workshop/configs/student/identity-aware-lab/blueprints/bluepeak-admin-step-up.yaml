@@ -1,0 +1,30 @@
+version: 1
+metadata:
+  name: BluePeak - Admin step-up authorization flow
+entries:
+  - id: bluepeak-admin-step-up-flow
+    model: authentik_flows.flow
+    identifiers:
+      slug: bluepeak-admin-step-up
+    attrs:
+      name: BluePeak Admin step-up
+      title: Extra verificatie voor %(app)s
+      designation: authorization
+      authentication: require_authenticated
+
+  - id: bluepeak-admin-totp-validation
+    model: authentik_stages_authenticator_validate.authenticatorvalidatestage
+    identifiers:
+      name: bluepeak-admin-totp-validation
+    attrs:
+      device_classes:
+        - totp
+      not_configured_action: deny
+      last_auth_threshold: seconds=0
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf bluepeak-admin-step-up-flow
+      stage: !KeyOf bluepeak-admin-totp-validation
+      order: 10
+

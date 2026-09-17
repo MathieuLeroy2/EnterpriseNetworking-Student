@@ -1,0 +1,91 @@
+enable
+configure terminal
+hostname SW-ACC2
+no ip domain-lookup
+ip domain-name bluepeak.local
+crypto key generate rsa modulus 1024
+ip ssh version 2
+
+! Wachtwoorden, lokale gebruikers en secrets zijn bewust niet opgenomen.
+
+vlan 30
+ name IT
+vlan 40
+ name SERVERS
+vlan 60
+ name IOT
+vlan 70
+ name DMZ
+vlan 99
+ name MGMT
+exit
+
+interface FastEthernet0/1
+ description PC_IT
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/2
+ description CAM_IOT
+ switchport mode access
+ switchport access vlan 60
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/10
+ description SRV_APP
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/11
+ description SRV_FIN
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/20
+ description SRV_WEB_DMZ
+ switchport mode access
+ switchport access vlan 70
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/21
+ description SRV_MGMT_JUMP
+ switchport mode access
+ switchport access vlan 99
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/24
+ description TRUNK_TO_SW_CORE_SINGLE_UPLINK
+ switchport mode trunk
+exit
+
+interface Vlan99
+ description MANAGEMENT_SVI
+ ip address 10.30.99.12 255.255.255.0
+ no shutdown
+exit
+
+ip default-gateway 10.30.99.1
+
+! Bewust auditpunt: servers en IT hangen aan dezelfde access switch.
+! Bewust auditpunt: geen tweede uplink.
+! Bewust auditpunt: trunk is niet beperkt.
+
+line console 0
+ logging synchronous
+exit
+
+line vty 0 4
+ transport input telnet ssh
+exit
+
+end
+write memory

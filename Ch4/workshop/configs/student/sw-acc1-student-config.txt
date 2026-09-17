@@ -1,0 +1,68 @@
+enable
+configure terminal
+hostname SW-ACC1
+no ip domain-lookup
+ip domain-name bluepeak.local
+crypto key generate rsa modulus 1024
+ip ssh version 2
+
+! Wachtwoorden, lokale gebruikers en secrets zijn bewust niet opgenomen.
+
+vlan 10
+ name STAFF
+vlan 20
+ name FINANCE
+vlan 50
+ name GUESTS
+vlan 99
+ name MGMT
+exit
+
+interface FastEthernet0/1
+ description PC_STAFF
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/2
+ description PC_FINANCE
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/3
+ description PC_GUEST
+ switchport mode access
+ switchport access vlan 50
+ spanning-tree portfast
+exit
+
+interface FastEthernet0/24
+ description TRUNK_TO_SW_CORE_SINGLE_UPLINK
+ switchport mode trunk
+exit
+
+interface Vlan99
+ description MANAGEMENT_SVI
+ ip address 10.30.99.11 255.255.255.0
+ no shutdown
+exit
+
+ip default-gateway 10.30.99.1
+
+! Bewust auditpunt: geen tweede uplink.
+! Bewust auditpunt: trunk is niet beperkt.
+! Bewust auditpunt: management is niet beperkt tot IT.
+
+line console 0
+ logging synchronous
+exit
+
+line vty 0 4
+ transport input telnet ssh
+exit
+
+end
+write memory

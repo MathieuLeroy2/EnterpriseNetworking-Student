@@ -1,0 +1,103 @@
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PG_DB:-authentik}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks:
+      - identity
+
+  server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.3}
+    command: server
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    ports:
+      - "${COMPOSE_PORT_HTTP:-9000}:9000"
+      - "${COMPOSE_PORT_HTTPS:-9443}:9443"
+    shm_size: 512mb
+    volumes:
+      - ./data:/data
+      - ./custom-templates:/templates
+    networks:
+      - identity
+
+  worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.3}
+    command: worker
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    shm_size: 512mb
+    user: root
+    volumes:
+      - ./data:/data
+      - ./certs:/certs
+      - ./custom-templates:/templates
+    networks:
+      - identity
+
+  oidc-client:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-CHANGE_ME_AFTER_PROVIDER_CREATION}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-CHANGE_ME_AFTER_PROVIDER_CREATION}
+      OIDC_AUTHORIZATION_URL: http://localhost:9000/application/o/authorize/
+      OIDC_TOKEN_URL: http://server:9000/application/o/token/
+      OIDC_USERINFO_URL: http://server:9000/application/o/userinfo/
+      OIDC_REDIRECT_URI: http://localhost:8089/callback
+      OIDC_SCOPES: openid profile email
+    command:
+      - python
+      - /app/app.py
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./oidc-client/app.py:/app/app.py:ro
+    networks:
+      - identity
+
+volumes:
+  database:
+    driver: local
+
+networks:
+  identity:
+    name: ch9-authentik-identity
+

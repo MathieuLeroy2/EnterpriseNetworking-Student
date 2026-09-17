@@ -1,0 +1,66 @@
+enable
+configure terminal
+hostname SW-CORE
+no ip domain-lookup
+ip domain-name bluepeak.local
+crypto key generate rsa modulus 1024
+ip ssh version 2
+
+! Wachtwoorden, lokale gebruikers en secrets zijn bewust niet opgenomen.
+! Studentconfig: werkend, maar met bewust brede trunks en brede managementbereikbaarheid.
+
+vlan 10
+ name STAFF
+vlan 20
+ name FINANCE
+vlan 30
+ name IT
+vlan 40
+ name SERVERS
+vlan 50
+ name GUESTS
+vlan 60
+ name IOT
+vlan 70
+ name DMZ
+vlan 99
+ name MGMT
+exit
+
+interface GigabitEthernet0/1
+ description TRUNK_TO_R_FW
+ switchport mode trunk
+exit
+
+interface FastEthernet0/1
+ description TRUNK_TO_SW_ACC1_SINGLE_UPLINK
+ switchport mode trunk
+exit
+
+interface FastEthernet0/2
+ description TRUNK_TO_SW_ACC2_SINGLE_UPLINK
+ switchport mode trunk
+exit
+
+interface Vlan99
+ description MANAGEMENT_SVI
+ ip address 10.30.99.2 255.255.255.0
+ no shutdown
+exit
+
+ip default-gateway 10.30.99.1
+
+! Bewust auditpunt: geen expliciete STP-rootkeuze.
+! Bewust auditpunt: ongebruikte poorten blijven in VLAN 1 en zijn niet uitgeschakeld.
+! Bewust auditpunt: trunks laten standaard alle VLANs toe.
+
+line console 0
+ logging synchronous
+exit
+
+line vty 0 4
+ transport input telnet ssh
+exit
+
+end
+write memory

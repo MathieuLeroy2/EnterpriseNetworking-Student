@@ -1,0 +1,101 @@
+enable
+configure terminal
+hostname R-FW
+no ip domain-lookup
+ip domain-name bluepeak.local
+crypto key generate rsa modulus 1024
+ip ssh version 2
+
+! Wachtwoorden, lokale gebruikers en secrets zijn bewust niet opgenomen.
+! Deze studentconfig is een werkende beginsituatie met bewuste auditpunten.
+
+interface GigabitEthernet0/0
+ description TRUNK_TO_SW_CORE
+ no shutdown
+exit
+
+interface GigabitEthernet0/0.10
+ description VLAN10_STAFF
+ encapsulation dot1Q 10
+ ip address 10.30.10.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.20
+ description VLAN20_FINANCE
+ encapsulation dot1Q 20
+ ip address 10.30.20.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.30
+ description VLAN30_IT
+ encapsulation dot1Q 30
+ ip address 10.30.30.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.40
+ description VLAN40_SERVERS
+ encapsulation dot1Q 40
+ ip address 10.30.40.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.50
+ description VLAN50_GUESTS
+ encapsulation dot1Q 50
+ ip address 10.30.50.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.60
+ description VLAN60_IOT
+ encapsulation dot1Q 60
+ ip address 10.30.60.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.70
+ description VLAN70_DMZ
+ encapsulation dot1Q 70
+ ip address 10.30.70.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.99
+ description VLAN99_MGMT
+ encapsulation dot1Q 99
+ ip address 10.30.99.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/1
+ description OUTSIDE_TO_ISP
+ ip address 203.0.113.1 255.255.255.252
+ ip nat outside
+ no shutdown
+exit
+
+ip access-list standard NAT_INSIDE
+ permit 10.30.0.0 0.0.255.255
+exit
+
+ip nat inside source list NAT_INSIDE interface GigabitEthernet0/1 overload
+ip nat inside source static tcp 10.30.70.10 80 203.0.113.1 80
+
+ip route 0.0.0.0 0.0.0.0 203.0.113.2
+
+! Bewust auditpunt: managementnetwerk wordt niet afgeschermd op de router.
+! Studenten moeten vaststellen dat gewone clientzones management kunnen bereiken.
+
+line console 0
+ logging synchronous
+exit
+
+line vty 0 4
+ transport input telnet ssh
+exit
+
+end
+write memory

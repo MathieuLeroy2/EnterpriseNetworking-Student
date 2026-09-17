@@ -1,0 +1,48 @@
+http:
+  routers:
+    authentik:
+      rule: "Host(`auth.bluepeak.test`)"
+      entryPoints:
+        - web
+      service: authentik
+      middlewares:
+        - security-headers
+
+    public:
+      rule: "Host(`public.bluepeak.test`)"
+      entryPoints:
+        - web
+      service: public
+      middlewares:
+        - security-headers
+
+    # Stap 6: voeg de protected-outpost-router toe.
+
+    # Stap 7: voeg de intranetrouter met forward auth toe.
+
+    # Stap 11: voeg monitoring en partner toe.
+
+    # Stap 13: voeg admin toe.
+
+  services:
+    authentik:
+      loadBalancer:
+        servers:
+          - url: "http://server:9000"
+
+    public:
+      loadBalancer:
+        servers:
+          - url: "http://public:8080"
+
+    # Voeg hier de outpostservice en beschermde backendservices toe.
+
+  middlewares:
+    security-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+    # Stap 6: voeg hier authentik-forward toe.
+

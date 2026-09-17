@@ -1,0 +1,177 @@
+services:
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PG_DB:-authentik}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks:
+      - identity-aware
+
+  server:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.3}
+    command: server
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    shm_size: 512mb
+    volumes:
+      - ./data:/data
+      - ./custom-templates:/templates
+    networks:
+      - identity-aware
+
+  worker:
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.3}
+    command: worker
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    shm_size: 512mb
+    user: root
+    volumes:
+      - ./data:/data
+      - ./certs:/certs
+      - ./custom-templates:/templates
+    networks:
+      - identity-aware
+
+  reverse-proxy:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--accesslog=true"
+    ports:
+      - "8100:80"
+      - "8188:8080"
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      - server
+      - public
+      - intranet
+      - monitoring
+      - admin
+      - partner
+    networks:
+      - identity-aware
+
+  public:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    environment:
+      APP_TITLE: Public status
+      APP_AUDIENCE: Iedereen
+      APP_SENSITIVITY: Publiek
+    command:
+      - python
+      - /app/app.py
+    volumes:
+      - ./apps/app.py:/app/app.py:ro
+    networks:
+      - identity-aware
+
+  intranet:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    environment:
+      APP_TITLE: BluePeak Intranet
+      APP_AUDIENCE: Medewerkers
+      APP_SENSITIVITY: Intern
+    command:
+      - python
+      - /app/app.py
+    volumes:
+      - ./apps/app.py:/app/app.py:ro
+    networks:
+      - identity-aware
+
+  monitoring:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    environment:
+      APP_TITLE: BluePeak Monitoring
+      APP_AUDIENCE: IT
+      APP_SENSITIVITY: Vertrouwelijk
+    command:
+      - python
+      - /app/app.py
+    volumes:
+      - ./apps/app.py:/app/app.py:ro
+    networks:
+      - identity-aware
+
+  admin:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    environment:
+      APP_TITLE: BluePeak Admin
+      APP_AUDIENCE: IT-admins met MFA
+      APP_SENSITIVITY: Kritiek
+    command:
+      - python
+      - /app/app.py
+    volumes:
+      - ./apps/app.py:/app/app.py:ro
+    networks:
+      - identity-aware
+
+  partner:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    environment:
+      APP_TITLE: BluePeak Partner Portal
+      APP_AUDIENCE: Externe partners
+      APP_SENSITIVITY: Beperkt
+    command:
+      - python
+      - /app/app.py
+    volumes:
+      - ./apps/app.py:/app/app.py:ro
+    networks:
+      - identity-aware
+
+volumes:
+  database:
+    driver: local
+
+networks:
+  identity-aware:
+    name: ch10-identity-aware
+

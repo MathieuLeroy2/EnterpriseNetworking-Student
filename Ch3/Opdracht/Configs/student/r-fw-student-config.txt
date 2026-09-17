@@ -1,0 +1,126 @@
+enable
+configure terminal
+hostname R-FW
+no ip domain-lookup
+
+enable secret class
+username admin privilege 15 secret class
+ip domain-name bluepeak.local
+crypto key generate rsa modulus 1024
+ip ssh version 2
+
+interface GigabitEthernet0/0
+ description TRUNK_TO_SW_CORE
+ no ip address
+ no shutdown
+exit
+
+interface GigabitEthernet0/0.10
+ description GW_STAFF
+ encapsulation dot1Q 10
+ ip address 10.30.10.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.20
+ description GW_FINANCE
+ encapsulation dot1Q 20
+ ip address 10.30.20.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.30
+ description GW_IT
+ encapsulation dot1Q 30
+ ip address 10.30.30.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.40
+ description GW_SERVERS
+ encapsulation dot1Q 40
+ ip address 10.30.40.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.50
+ description GW_GUESTS_WEAK_POLICY
+ encapsulation dot1Q 50
+ ip address 10.30.50.1 255.255.255.0
+ ip access-group GUEST_WEAK in
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.60
+ description GW_IOT_NO_POLICY
+ encapsulation dot1Q 60
+ ip address 10.30.60.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.70
+ description GW_DMZ_WEAK_POLICY
+ encapsulation dot1Q 70
+ ip address 10.30.70.1 255.255.255.0
+ ip access-group DMZ_WEAK in
+ ip nat inside
+exit
+
+interface GigabitEthernet0/0.99
+ description GW_MGMT_TOO_BROAD
+ encapsulation dot1Q 99
+ ip address 10.30.99.1 255.255.255.0
+ ip nat inside
+exit
+
+interface GigabitEthernet0/1
+ description OUTSIDE_TO_ISP
+ ip address 203.0.113.1 255.255.255.252
+ ip nat outside
+ no shutdown
+exit
+
+ip access-list extended GUEST_WEAK
+ remark Weak policy: guests are blocked from management only.
+ deny ip 10.30.50.0 0.0.0.255 10.30.99.0 0.0.0.255
+ permit ip 10.30.50.0 0.0.0.255 any
+exit
+
+ip access-list extended DMZ_WEAK
+ remark Weak policy: DMZ can freely reach internal networks.
+ permit ip 10.30.70.0 0.0.0.255 10.30.0.0 0.0.255.255
+ permit ip 10.30.70.0 0.0.0.255 any
+exit
+
+ip access-list extended STAFF_WEAK
+ remark Documentation-only ACL, not applied. Staff access is not restricted.
+ permit ip 10.30.10.0 0.0.0.255 any
+exit
+
+ip access-list extended MGMT_WEAK
+ remark Weak policy: this would allow everyone to reach management.
+ permit ip any 10.30.99.0 0.0.0.255
+exit
+
+access-list 1 permit 10.30.0.0 0.0.255.255
+ip nat inside source list 1 interface GigabitEthernet0/1 overload
+
+! Intentional design flaw:
+! Public HTTP/HTTPS is forwarded to the internal app server, not to the DMZ server.
+ip nat inside source static tcp 10.30.40.10 80 203.0.113.1 80 extendable
+ip nat inside source static tcp 10.30.40.10 443 203.0.113.1 443 extendable
+
+ip route 0.0.0.0 0.0.0.0 203.0.113.2
+
+line console 0
+ logging synchronous
+ login local
+exit
+
+line vty 0 4
+ login local
+ transport input telnet ssh
+exit
+
+end
+write memory

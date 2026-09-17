@@ -1,0 +1,22 @@
+enable
+configure terminal
+hostname ISP
+no ip domain-lookup
+
+interface GigabitEthernet0/0
+ description TO_R_FW
+ ip address 203.0.113.2 255.255.255.252
+ no shutdown
+exit
+
+interface Loopback0
+ description INTERNET_TEST_HOST
+ ip address 198.51.100.10 255.255.255.255
+exit
+
+line console 0
+ logging synchronous
+exit
+
+end
+write memory
